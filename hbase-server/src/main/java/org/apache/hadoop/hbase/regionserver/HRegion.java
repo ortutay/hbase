@@ -6148,7 +6148,9 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       if (outResults.isEmpty()) {
         // Usually outResults is empty. This is true when next is called
         // to handle scan or get operation.
+          System.out.println("peek 3 " + this.storeHeap.peek());
         moreValues = nextInternal(outResults, scannerContext);
+        System.out.println("peek 4 " + this.storeHeap.peek());
       } else {
         List<Cell> tmpList = new ArrayList<Cell>();
         moreValues = nextInternal(tmpList, scannerContext);
@@ -6169,6 +6171,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       if (isFilterDoneInternal()) {
         moreValues = false;
       }
+      System.out.println("peek 5 " + this.storeHeap.peek());
       return moreValues;
     }
 
@@ -6274,6 +6277,11 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         throw new IllegalArgumentException("Scanner context cannot be null");
       }
 
+      System.out.println("--------");
+      for (StackTraceElement stackTrace : Thread.currentThread().getStackTrace()) {
+    	  System.out.println(stackTrace.toString());
+      }
+      
       scannerContext.clearProgress();
 
       RpcCallContext rpcCall = RpcServer.getCurrentCall();
