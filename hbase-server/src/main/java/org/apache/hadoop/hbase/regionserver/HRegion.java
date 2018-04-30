@@ -79,6 +79,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -5972,6 +5974,8 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
     private final long maxResultSize;
     private final ScannerContext defaultScannerContext;
     private final FilterWrapper filter;
+    
+    private long count = 0;
 
     @Override
     public HRegionInfo getRegionInfo() {
@@ -6148,9 +6152,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       if (outResults.isEmpty()) {
         // Usually outResults is empty. This is true when next is called
         // to handle scan or get operation.
-          System.out.println("peek 3 " + this.storeHeap.peek());
         moreValues = nextInternal(outResults, scannerContext);
-        System.out.println("peek 4 " + this.storeHeap.peek());
       } else {
         List<Cell> tmpList = new ArrayList<Cell>();
         moreValues = nextInternal(tmpList, scannerContext);
@@ -6171,7 +6173,6 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       if (isFilterDoneInternal()) {
         moreValues = false;
       }
-      System.out.println("peek 5 " + this.storeHeap.peek());
       return moreValues;
     }
 
@@ -6210,6 +6211,40 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         ScannerContext scannerContext, byte[] currentRow, int offset, short length)
         throws IOException {
       Cell nextKv;
+
+      String name = this.getRegionInfo().getTable().getNameAsString();
+      if (name.equals("FLOATS")) {
+//    	  System.out.println("FLOATS special case");
+      	results.clear();
+      	KeyValue kv;
+			try {
+				kv = new KeyValue(
+						Hex.decodeHex("8000000000000012".toCharArray()),
+						Hex.decodeHex("30".toCharArray()),
+						Hex.decodeHex("00000000".toCharArray()),
+						1524531755484L,
+						KeyValue.Type.Put,
+						Hex.decodeHex("78".toCharArray()));
+			} catch (DecoderException e) {
+				throw new RuntimeException(e);
+			}
+      	results.add(kv);
+			try {
+				kv = new KeyValue(
+						Hex.decodeHex("800000000000000d".toCharArray()),
+						Hex.decodeHex("30".toCharArray()),
+						Hex.decodeHex("800b".toCharArray()),
+						1524531755484L,
+						KeyValue.Type.Put,
+						Hex.decodeHex("bf10b05f".toCharArray()));
+			} catch (DecoderException e) {
+				throw new RuntimeException(e);
+			}
+      	results.add(kv);
+        return scannerContext.setScannerState(NextState.SIZE_LIMIT_REACHED).hasMoreValues();
+      }
+      
+
       boolean moreCellsInRow = false;
       boolean tmpKeepProgress = scannerContext.getKeepProgress();
       // Scanning between column families and thus the scope is between cells
@@ -6219,7 +6254,93 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         // different column families. To do this, we toggle the keep progress flag on during calls
         // to the StoreScanner to ensure that any progress made thus far is not wiped away.
         scannerContext.setKeepProgress(true);
-        heap.next(results, scannerContext);
+        boolean next = heap.next(results, scannerContext);
+//		System.out.println("-- " + next + " " + name);
+        if (next && name.startsWith("FLOATS")) {
+//        	System.out.println("FLOATS results size: " + results.size());
+//        	Cell cell = new Cell();
+//        	try {
+//				Hex.decodeHex("800000000000000d".toCharArray());
+//			} catch (DecoderException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
+//        	System.out.println("----");
+//        	System.out.println("Before:");
+//        	for (int i = 0; i < results.size(); i++) {
+//        		Cell result = results.get(i);
+//        		System.out.println("Cell row " + i + ": " + Hex.encodeHexString(result.getRow()));
+//        		System.out.println("Cell CF " + i + ": " + Hex.encodeHexString(result.getFamily()));
+//        		System.out.println("Cell CQ " + i + ": " + Hex.encodeHexString(result.getQualifier()));
+//        		System.out.println("Cell TS " + i + ": " + result.getTimestamp());
+//        		System.out.println("Cell type" + i + ": " + result.getTypeByte());
+//        		System.out.println("Cell MVCC version " + i + ": " + result.getMvccVersion());
+//        		System.out.println("Cell value " + i + ": " + Hex.encodeHexString(result.getValue()));
+//        		System.out.println("Cell row array " + i + ": " + Hex.encodeHexString(result.getRowArray()));
+//        	}
+//        	System.out.println("----");
+        	
+        	if (results.size() == 1) {
+        		System.out.println("Replacing 1");
+            	results.remove(0);
+            	KeyValue kv;
+				try {
+					kv = new KeyValue(
+							Hex.decodeHex("800000000000000d".toCharArray()),
+							Hex.decodeHex("30".toCharArray()),
+							Hex.decodeHex("00000000".toCharArray()),
+							1524531755484L,
+							KeyValue.Type.Put);
+				} catch (DecoderException e) {
+					throw new RuntimeException(e);
+				}
+            	results.add(kv);
+        	}
+        	
+        	if (results.size() == 2) {
+//        		System.out.println("Replacing 2");
+            	results.clear();
+            	KeyValue kv;
+				try {
+					kv = new KeyValue(
+							Hex.decodeHex("8000000000000012".toCharArray()),
+							Hex.decodeHex("30".toCharArray()),
+							Hex.decodeHex("00000000".toCharArray()),
+							1524531755484L,
+							KeyValue.Type.Put,
+							Hex.decodeHex("78".toCharArray()));
+				} catch (DecoderException e) {
+					throw new RuntimeException(e);
+				}
+            	results.add(kv);
+				try {
+					kv = new KeyValue(
+							Hex.decodeHex("800000000000000d".toCharArray()),
+							Hex.decodeHex("30".toCharArray()),
+							Hex.decodeHex("800b".toCharArray()),
+							1524531755484L,
+							KeyValue.Type.Put,
+							Hex.decodeHex("bf10b05f".toCharArray()));
+				} catch (DecoderException e) {
+					throw new RuntimeException(e);
+				}
+            	results.add(kv);
+        	}
+//        	System.out.println("After:");
+//        	for (int i = 0; i < results.size(); i++) {
+//        		Cell result = results.get(i);
+//        		System.out.println("Cell row " + i + ": " + Hex.encodeHexString(result.getRow()));
+//        		System.out.println("Cell CF " + i + ": " + Hex.encodeHexString(result.getFamily()));
+//        		System.out.println("Cell CQ " + i + ": " + Hex.encodeHexString(result.getQualifier()));
+//        		System.out.println("Cell TS " + i + ": " + result.getTimestamp());
+//        		System.out.println("Cell type" + i + ": " + result.getTypeByte());
+//        		System.out.println("Cell MVCC version " + i + ": " + result.getMvccVersion());
+//        		System.out.println("Cell value " + i + ": " + Hex.encodeHexString(result.getValue()));
+//        		System.out.println("Cell row array " + i + ": " + Hex.encodeHexString(result.getRowArray()));
+//        	}
+//        	System.out.println("----");
+//        	heap.next(results, scannerContext);
+        }
         scannerContext.setKeepProgress(tmpKeepProgress);
 
         nextKv = heap.peek();
@@ -6277,10 +6398,10 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         throw new IllegalArgumentException("Scanner context cannot be null");
       }
 
-      System.out.println("--------");
-      for (StackTraceElement stackTrace : Thread.currentThread().getStackTrace()) {
-    	  System.out.println(stackTrace.toString());
-      }
+//      System.out.println("--------");
+//      for (StackTraceElement stackTrace : Thread.currentThread().getStackTrace()) {
+//    	  System.out.println(stackTrace.toString());
+//      }
       
       scannerContext.clearProgress();
 
@@ -6303,11 +6424,35 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       }
 
       boolean shouldStop = shouldStop(current);
+      
+      if (this.getRegionInfo().getTable().getNameAsString().startsWith("FLOAT")) {
+          count++;
+          shouldStop = shouldStop || count % 500000 == 0;
+//          System.out.println("- " + count);
+      }
+
       if (shouldStop) {
     	  return scannerContext.setScannerState(NextState.NO_MORE_VALUES).hasMoreValues();
       }
 
       populateResult(results, this.storeHeap, scannerContext, currentRow, offset, length);
+
+//      if (this.getRegionInfo().getTable().getNameAsString().startsWith("FLOAT")) {
+//      	  System.out.println("----");
+//      	  System.out.println("populateResult gave:");
+//      	  for (int i = 0; i < results.size(); i++) {
+//    		Cell result = results.get(i);
+//    		System.out.println("Cell row " + i + ": " + Hex.encodeHexString(result.getRow()));
+//    		System.out.println("Cell CF " + i + ": " + Hex.encodeHexString(result.getFamily()));
+//    		System.out.println("Cell CQ " + i + ": " + Hex.encodeHexString(result.getQualifier()));
+//    		System.out.println("Cell TS " + i + ": " + result.getTimestamp());
+//    		System.out.println("Cell type" + i + ": " + result.getTypeByte());
+//    		System.out.println("Cell MVCC version " + i + ": " + result.getMvccVersion());
+//    		System.out.println("Cell value " + i + ": " + Hex.encodeHexString(result.getValue()));
+//    		System.out.println("Cell row array " + i + ": " + Hex.encodeHexString(result.getRowArray()));
+//      	  }
+//      	  System.out.println("----");
+//      }
 
       Cell nextKv = this.storeHeap.peek();
       shouldStop = shouldStop(nextKv);
